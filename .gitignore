@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+backup/config.json
+*.log
+*.key
+*.pem
+.env*
+recovery/
+*.age
+*.mp3

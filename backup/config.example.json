@@ -1,0 +1,5 @@
+{
+  "checkout": "/path/to/dedicated-shell-racer-backup-checkout",
+  "flows_file": "/path/to/node-red-user-directory/flows.json",
+  "firmware_sources": []
+}
