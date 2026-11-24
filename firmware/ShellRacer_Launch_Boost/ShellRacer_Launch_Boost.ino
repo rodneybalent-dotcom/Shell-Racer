@@ -511,6 +511,7 @@ void readColour() {
       abs((int)b8-fleet.blueRgb[2])<=25
     : b8 == 255 && r8 >= 45 && r8 <= 105 && g8 >= 105 && g8 <= 190;
   if (blue) yellow = green = red = false;
+  else if (yellow) green = false;
 }
 
 // ---------- SPEED LED ----------
@@ -1139,6 +1140,7 @@ void loop() {
   if (colourSampled) {
     if (!startupLightsActive) updateRedDetection(now);
     if (yellow && forward) {
+      greenTimer.stop(); // Yellow takes priority even before boost qualifies.
       if (yellowHits < YELLOW_HITS_REQUIRED) ++yellowHits;
       if (yellowHits >= YELLOW_HITS_REQUIRED && !yellowLatched) {
         yellowLatched = true; boostTimer.start(now, fleet.yellowMs); greenTimer.stop();
