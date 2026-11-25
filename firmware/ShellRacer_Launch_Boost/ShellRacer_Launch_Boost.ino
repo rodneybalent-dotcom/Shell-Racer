@@ -510,6 +510,9 @@ void readColour() {
     ? abs((int)r8-fleet.blueRgb[0])<=15 && abs((int)g8-fleet.blueRgb[1])<=15 &&
       abs((int)b8-fleet.blueRgb[2])<=15
     : b8 == 255 && r8 >= 45 && r8 <= 105 && g8 >= 105 && g8 <= 190;
+  // White-table samples can have a slight green cast after normalisation.
+  const int greenLead = (int)g8 - max(r8, b8);
+  green = green && greenLead >= 45;
   if (blue) yellow = green = red = false;
   else if (yellow) green = false;
 }
