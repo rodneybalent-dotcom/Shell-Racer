@@ -130,7 +130,7 @@ struct FleetSettings {
   uint16_t launchBoostRemainingMs;
   uint32_t launchBoostReceivedMs;
 };
-FleetSettings fleet = {100, ESC_BOOST_MAX_US - ESC_FORWARD_MAX_US, BOOST_MS,
+FleetSettings fleet = {60, ESC_BOOST_MAX_US - ESC_FORWARD_MAX_US, BOOST_MS,
   GREEN_SLOWDOWN_PERCENT, GREEN_SLOWDOWN_MS, CORNER_SLOWDOWN_PERCENT,
   BOOST_CORNER_SLOWDOWN_PERCENT, {-1,-1,-1,-1,-1,-1,-1,-1,-1}, 0};
 // Race-enabled cars require a fresh fleet response before accepting throttle.
