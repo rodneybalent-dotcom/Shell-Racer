@@ -70,7 +70,7 @@ const int CORNER_SLOWDOWN_PERCENT = 40;
 const int BOOST_CORNER_SLOWDOWN_PERCENT = 30;
 const int CORNER_START_US = 150;
 const int BOOST_CORNER_START_US = 80;
-const int GREEN_SLOWDOWN_PERCENT = 50;
+const int GREEN_SLOWDOWN_PERCENT = 20;
 const uint32_t GREEN_SLOWDOWN_MS = 1500;
 const uint32_t BOOST_MS = 1000;
 const uint8_t YELLOW_HITS_REQUIRED = 2;
@@ -1168,7 +1168,7 @@ void loop() {
   if (boost || redBoostRunning) greenTimer.stop();
   int output = throttleOutput(rc.throttle.pulse, boost, now);
   if (!boost && !redBoostRunning && greenTimer.active(now) && output > ESC_NEUTRAL_US)
-    output -= (long)(output - ESC_NEUTRAL_US) * fleet.greenPercent / 100;
+    output -= (long)(output - ESC_NEUTRAL_US) * min(fleet.greenPercent, 35) / 100;
   // Apply red power only during forward throttle, and respect corner limiting.
   // 10% is an ESC command increase, not guaranteed measured vehicle speed.
   if (redBoostRunning && forward && output > ESC_NEUTRAL_US) {
