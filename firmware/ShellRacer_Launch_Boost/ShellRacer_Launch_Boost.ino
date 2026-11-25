@@ -1079,9 +1079,14 @@ void loop() {
   }
 
   const bool raceOnline = fleet.raceValid && millis()-fleet.raceRequestMs < RACE_LINK_TIMEOUT_MS;
-  const bool racePhaseLocks = fleet.racePhase == RACE_STAGE || fleet.racePhase == RACE_COUNTDOWN ||
-    fleet.racePhase == RACE_FINISHED;
-  raceLocked = RACE_MODE_ENABLED && (!raceOnline || racePhaseLocks);
+  // An offline boot allows physical RC. Keep an explicit lock until a fresh
+  // server response clears it, even if the link drops or a reply is invalid.
+  static bool serverRaceLock = false;
+  if (raceOnline) {
+    serverRaceLock = fleet.racePhase == RACE_STAGE || fleet.racePhase == RACE_COUNTDOWN ||
+      fleet.racePhase == RACE_FINISHED;
+  }
+  raceLocked = RACE_MODE_ENABLED && serverRaceLock;
   raceStagingLights = raceOnline && (fleet.raceLightsWaiting ||
     fleet.racePhase == RACE_STAGE || fleet.racePhase == RACE_COUNTDOWN);
   updateRaceLaps(now, colourSampled);
