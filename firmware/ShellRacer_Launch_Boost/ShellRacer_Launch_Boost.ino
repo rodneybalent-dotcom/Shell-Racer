@@ -129,6 +129,7 @@ struct FleetSettings {
   uint8_t stripsPerLap;
   uint16_t launchBoostRemainingMs;
   uint32_t launchBoostReceivedMs;
+  int steeringTrim[3];  // Centre, left endpoint, right endpoint in slider order.
 };
 FleetSettings fleet = {60, ESC_BOOST_MAX_US - ESC_FORWARD_MAX_US, BOOST_MS,
   GREEN_SLOWDOWN_PERCENT, GREEN_SLOWDOWN_MS, CORNER_SLOWDOWN_PERCENT,
@@ -226,8 +227,9 @@ void pollFleet(const char *packet, int &lastRacePhase, bool fast) {
   http.setTimeout(timeoutMs);
   http.setConnectTimeout(timeoutMs);
   if (!http.begin(client, url)) return;
-  const char *fleetHeaders[] = {"X-ShellRacer-Flash", "X-ShellRacer-Race", "X-ShellRacer-Race-Lights", "X-ShellRacer-Winner", "X-ShellRacer-Strips", "X-ShellRacer-Launch-Boost"};
-  http.collectHeaders(fleetHeaders, 6);
+  const char *fleetHeaders[] = {"X-ShellRacer-Flash", "X-ShellRacer-Race", "X-ShellRacer-Race-Lights", "X-ShellRacer-Winner", "X-ShellRacer-Strips", "X-ShellRacer-Launch-Boost", "X-ShellRacer-Steering"};
+  http.collectHeaders(fleetHeaders, 7);
+  http.addHeader("X-ShellRacer-Steering", "1");
   http.addHeader("X-ShellRacer-Race", "1");
   http.addHeader("X-ShellRacer-Flash", "1");
   http.addHeader("X-ShellRacer-Race-Lights", "1");
@@ -292,6 +294,20 @@ void pollFleet(const char *packet, int &lastRacePhase, bool fast) {
       next.raceLightsWaiting = raceLights == "stage" || raceLights == "countdown";
       if (next.raceValid) {
         lastRacePhase = raceLights == "countdown" ? RACE_COUNTDOWN : next.racePhase;
+      }
+      const String steeringHeader = http.header("X-ShellRacer-Steering");
+      int centreTrim, leftTrim, rightTrim, steeringEnd = 0;
+      if (sscanf(steeringHeader.c_str(), "S1 %4d %4d %4d%n", &centreTrim, &leftTrim, &rightTrim, &steeringEnd) == 3 &&
+          steeringEnd == (int)steeringHeader.length() &&
+          abs(centreTrim) <= 80 && abs(leftTrim) <= 100 && abs(rightTrim) <= 100) {
+        const int centre = STEER_CENTER_US - centreTrim;
+        const int left = STEER_CENTER_US + STEER_HIGH_TRAVEL_US - leftTrim;
+        const int right = STEER_CENTER_US - STEER_LOW_TRAVEL_US - rightTrim;
+        if (right >= 500 && left <= 2500 && centre - right >= 50 && left - centre >= 50) {
+          next.steeringTrim[0] = centreTrim;
+          next.steeringTrim[1] = leftTrim;
+          next.steeringTrim[2] = rightTrim;
+        }
       }
       xQueueOverwrite(fleetQueue, &next);
     }
@@ -754,8 +770,18 @@ void resetDriveState() {
   yellowHits = 0; yellowLatched = false;
   resetRedCharge();
 }
+int calibratedSteeringPulse(int demand) {
+  const int offset = demand - STEER_CENTER_US;
+  const int centre = STEER_CENTER_US - fleet.steeringTrim[0];
+  const int travel = offset < 0
+    ? STEER_LOW_TRAVEL_US + fleet.steeringTrim[2] - fleet.steeringTrim[0]
+    : STEER_HIGH_TRAVEL_US + fleet.steeringTrim[0] - fleet.steeringTrim[1];
+  const int baseTravel = offset < 0 ? STEER_LOW_TRAVEL_US : STEER_HIGH_TRAVEL_US;
+  return centre + (long)offset * travel / baseTravel;
+}
+
 void stopCar() {
-  steering.writeMicroseconds(STEER_CENTER_US);
+  steering.writeMicroseconds(calibratedSteeringPulse(STEER_CENTER_US));
   esc.writeMicroseconds(ESC_NEUTRAL_US);
   updateSpeedLed(ESC_NEUTRAL_US, false, false);
 }
@@ -892,6 +918,7 @@ void printDiagnostics(const RcReading &rc, const char *state, int escOutput) {
       "\"throttle\":{\"us\":%u,\"ok\":%s,\"age_ms\":%s,\"pulses\":%lu,\"invalid\":%lu},"
       "\"ch3\":{\"enabled\":%s,\"us\":%u,\"ok\":%s,\"age_ms\":%s,\"pulses\":%lu,\"invalid\":%lu}},"
     "\"control\":{\"steer_us\":%d,\"steer_pct\":%d,\"throttle_pct\":%d,\"esc_us\":%d,\"esc_neutral_us\":%d,\"reverse_phase\":%u},"
+    "\"steering_base\":[%d,%d,%d],"
     "\"track\":{\"colour_ok\":%s,\"rgb\":[%u,%u,%u],\"yellow\":%s,\"green\":%s,\"red\":%s,\"blue\":%s,\"colour_reads\":%lu,\"slow_reads\":%lu},"
     "\"effects\":{\"boost\":%s,\"boost_remaining_ms\":%lu,\"green_slowdown\":%s,\"green_remaining_ms\":%lu,\"corner_slowdown_pct\":%d},"
     "\"led\":{\"pwm\":%u,\"pct\":%u},"
@@ -903,7 +930,8 @@ void printDiagnostics(const RcReading &rc, const char *state, int escOutput) {
     rc.steer.pulse, rc.steer.ok?"true":"false", steerAge, (unsigned long)steerCount, (unsigned long)steerBad,
     rc.throttle.pulse, rc.throttle.ok?"true":"false", throttleAge, (unsigned long)throttleCount, (unsigned long)throttleBad,
     CH3_BOOST_ENABLED?"true":"false", rc.ch3.pulse, rc.ch3.ok?"true":"false", ch3Age, (unsigned long)ch3Count, (unsigned long)ch3Bad,
-    steeringCommand, steerPct, inputPct, escOutput, ESC_NEUTRAL_US, (unsigned int)reversePhase,
+    calibratedSteeringPulse(steeringCommand), steerPct, inputPct, escOutput, ESC_NEUTRAL_US, (unsigned int)reversePhase,
+    STEER_CENTER_US, STEER_CENTER_US + STEER_HIGH_TRAVEL_US, STEER_CENTER_US - STEER_LOW_TRAVEL_US,
     colourOK?"true":"false", r8,g8,b8, yellow?"true":"false", green?"true":"false", red?"true":"false", blue?"true":"false",
     (unsigned long)colourReadCount, (unsigned long)colourReadSlowCount,
     boosting?"true":"false", (unsigned long)max(max(yellowRemaining, redRemaining), launchRemaining),
@@ -1143,7 +1171,7 @@ void loop() {
     }
   }
   int steerCommand = limitSteeringPulse(rc.steer.pulse);
-  steering.writeMicroseconds(steerCommand);
+  steering.writeMicroseconds(calibratedSteeringPulse(steerCommand));
   int steeringOffset = steerCommand - STEER_CENTER_US;
   bool forward = (int)rc.throttle.pulse > RX_NEUTRAL_US + RX_DEADZONE_US;
 
