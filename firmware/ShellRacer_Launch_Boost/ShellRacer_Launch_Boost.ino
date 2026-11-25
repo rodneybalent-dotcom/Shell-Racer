@@ -503,12 +503,12 @@ void readColour() {
   bool *flags[] = {&yellow,&green,&red};
   for (int i=0;i<3;++i) {
     const int *ref = fleet.rgb + 3*i;
-    if (ref[0]>=0) *flags[i] = abs((int)r8-ref[0])<=25 &&
-      abs((int)g8-ref[1])<=25 && abs((int)b8-ref[2])<=25;
+    if (ref[0]>=0) *flags[i] = abs((int)r8-ref[0])<=15 &&
+      abs((int)g8-ref[1])<=15 && abs((int)b8-ref[2])<=15;
   }
   blue = fleet.raceValid && fleet.blueRgb[0] >= 0
-    ? abs((int)r8-fleet.blueRgb[0])<=25 && abs((int)g8-fleet.blueRgb[1])<=25 &&
-      abs((int)b8-fleet.blueRgb[2])<=25
+    ? abs((int)r8-fleet.blueRgb[0])<=15 && abs((int)g8-fleet.blueRgb[1])<=15 &&
+      abs((int)b8-fleet.blueRgb[2])<=15
     : b8 == 255 && r8 >= 45 && r8 <= 105 && g8 >= 105 && g8 <= 190;
   if (blue) yellow = green = red = false;
   else if (yellow) green = false;
